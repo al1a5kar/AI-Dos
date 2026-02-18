@@ -1,4 +1,4 @@
-# --- chat.py (версия с google-genai) ---
+# --- chat.py (полностью исправленная версия) ---
 
 import os
 import base64
@@ -20,13 +20,34 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 app = Flask(__name__)
-frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
+# --- Настройка CORS для GitHub Pages ---
+# Получаем список разрешенных источников из переменной окружения
+# Формат: "https://site1.com,https://site2.com" (через запятую)
+allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8080")
+allowed_origins = [origin.strip() for origin in allowed_origins_str.split(",")]
+
+# Добавляем GitHub Pages по умолчанию
+github_pages_url = os.getenv("GITHUB_PAGES_URL", "https://al1a5kar.github.io")
+if github_pages_url not in allowed_origins:
+    allowed_origins.append(github_pages_url)
+
+# Настраиваем CORS для всех API маршрутов
 CORS(app, resources={
     r"/api/*": {
-        "origins": [frontend_url]
+        "origins": allowed_origins,
+        "supports_credentials": True,
+        "allow_headers": ["Content-Type", "Authorization"],
+        "methods": ["GET", "POST", "OPTIONS"]
     }
 })
+
+# Добавляем обработчик OPTIONS для preflight запросов
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+    return response
 
 # --- Redis ---
 redis_client = None
@@ -49,7 +70,7 @@ if not gemini_api_key:
     raise ValueError("Не задан GEMINI_API_KEY")
 
 genai.configure(api_key=gemini_api_key)
-client = genai.GenerativeModel('gemini-2.0-flash')
+model = genai.GenerativeModel('gemini-2.0-flash')  # Переименовал client в model для ясности
 
 # --- Azure Speech ---
 speech_key = os.getenv("SPEECH_KEY")
@@ -58,12 +79,13 @@ speech_region = os.getenv("SPEECH_REGION")
 if not (speech_key and speech_region):
     logging.warning("Azure Speech отключён.")
 
-# --- Системная инструкция ---
+# --- Системная инструкция (обновлена для AI-Дос) ---
 SYSTEM_INSTRUCTION = """
-Ты ИИ-друг для детей 8–12 лет.
+Ты AI-Дос, интеллектуальный помощник для детей 8–12 лет.
 Отвечай коротко (до 100 слов), тепло и позитивно.
 Поддерживай ребёнка и задавай вопросы.
 Используй эмодзи ✨🚀🎨🌟
+Всегда представляйся как AI-Дос.
 """
 
 # --- Очистка текста ---
@@ -90,13 +112,33 @@ def validate_history(history):
     
     return True, "OK"
 
+# --- Корневой маршрут (для удобства) ---
+@app.route('/', methods=['GET'])
+def home():
+    """Информация о API"""
+    return jsonify({
+        "name": "AI-Дос",
+        "version": "1.0.0",
+        "description": "Интеллектуальный помощник для детей",
+        "endpoints": {
+            "health": "/api/health",
+            "chat": "/api/chat",
+            "speech": "/api/speech"
+        },
+        "status": "online"
+    })
+
 # --- CHAT API ---
-@app.route('/api/chat', methods=['POST'])
+@app.route('/api/chat', methods=['POST', 'OPTIONS'])
 def chat():
     """
     Обрабатывает запросы к чату с потоковой передачей ответов
     Ожидает JSON с полем "history"
     """
+    # Обработка OPTIONS запросов для CORS
+    if request.method == 'OPTIONS':
+        return '', 200
+
     try:
         data = request.json
         if not data:
@@ -129,7 +171,7 @@ def chat():
         def generate():
             """Генератор для потоковой передачи ответа"""
             try:
-                response = client.generate_content_stream(
+                response = model.generate_content_stream(
                     contents=messages
                 )
 
@@ -144,15 +186,19 @@ def chat():
 
     except Exception as e:
         logging.error(f"Ошибка /api/chat: {e}", exc_info=True)
-        return Response("Внутренняя ошибка сервера", status=500)
+        return jsonify({"error": "Внутренняя ошибка сервера"}), 500
 
 # --- SPEECH API ---
-@app.route('/api/speech', methods=['POST'])
+@app.route('/api/speech', methods=['POST', 'OPTIONS'])
 def speech():
     """
     Преобразует текст в речь с использованием Azure Speech Services
     Ожидает JSON с полем "text"
     """
+    # Обработка OPTIONS запросов для CORS
+    if request.method == 'OPTIONS':
+        return '', 200
+
     try:
         data = request.json
         if not data:
@@ -182,7 +228,7 @@ def speech():
             "Ocp-Apim-Subscription-Key": speech_key,
             "Content-Type": "application/ssml+xml",
             "X-Microsoft-OutputFormat": "audio-16khz-32kbitrate-mono-mp3",
-            "User-Agent": "KidsAI"
+            "User-Agent": "AI-Dos"
         }
 
         # Добавляем таймаут для запроса
@@ -209,12 +255,16 @@ def speech():
         return jsonify({"error": "Ошибка сервиса речи"}), 502
     except Exception as e:
         logging.error(f"Ошибка /api/speech: {e}", exc_info=True)
-        return Response("Внутренняя ошибка сервера", status=500)
+        return jsonify({"error": "Внутренняя ошибка сервера"}), 500
 
 # --- Health check endpoint ---
-@app.route('/api/health', methods=['GET'])
+@app.route('/api/health', methods=['GET', 'OPTIONS'])
 def health_check():
     """Проверка работоспособности сервера"""
+    # Обработка OPTIONS запросов для CORS
+    if request.method == 'OPTIONS':
+        return '', 200
+
     return jsonify({
         "status": "healthy",
         "gemini_configured": bool(gemini_api_key),
