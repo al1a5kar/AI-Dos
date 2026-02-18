@@ -1,0 +1,45 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <title>AI-Дос</title>
+    <link rel="icon" href="dos-avatar.png" type="image/png">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>AI-Дос ✨</h1>
+        </div>
+        <div class="chat-box" id="chat-box">
+            <div class="message ai-message">
+                <img src="dos-avatar.png" alt="ai-avatar" class="avatar">
+                <div class="message-content">
+                    <p>Сәлем! Я AI-Дос. Ты можешь задавать мне вопросы, фотографировать или отправлять файлы! 🚀</p>
+                </div>
+            </div>
+        </div>
+        <div class="chat-input-area">
+            <form id="chat-form">
+                <!-- Скрытое поле для загрузки файлов (общее) -->
+                <input type="file" id="file-input" accept="image/*" style="display: none;">
+                <!-- Скрытое поле для камеры -->
+                <input type="file" id="camera-input" accept="image/*" capture="environment" style="display: none;">
+                
+                <button type="button" id="camera-btn" title="Открыть камеру">📷</button>
+                <button type="button" id="upload-btn" title="Загрузить файл">📁</button>
+                
+                <input type="text" id="user-input" placeholder="Спроси AI-Доса..." autocomplete="off">
+                <button type="button" id="game-btn" title="Игра в загадки">🧩</button>
+                <button type="button" id="toggle-speech-btn">🔇</button> 
+                <button type="button" id="mic-btn">🎤</button>
+                <button type="submit">↩️</button>
+            </form>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
