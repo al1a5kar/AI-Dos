@@ -13,9 +13,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const cameraInput = document.getElementById("camera-input");
     const gameBtn = document.getElementById("game-btn");
 
-    // --- Настройка API URL ---
-    const CHAT_API_URL = "https://dos-ai.onrender.com/api/chat";
-    const SPEECH_API_URL = "https://dos-ai.onrender.com/api/speech";
+    // --- Настройка API URL (ИСПРАВЛЕНО!) ---
+    const CHAT_API_URL = "https://ai-dos.onrender.com/api/chat";
+    const SPEECH_API_URL = "https://ai-dos.onrender.com/api/speech";
 
     let conversationHistory = [];
     let currentAudio = null;
