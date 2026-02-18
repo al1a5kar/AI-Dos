@@ -48,7 +48,8 @@ gemini_api_key = "AIzaSyAkNugx2y8cwtbyf_NKjzR6bdZ7ZFdF6l4"  # Ваш ключ
 if not gemini_api_key: 
     raise ValueError("Не задан GEMINI_API_KEY")
 
-client = genai.Client(api_key=gemini_api_key)
+genai.configure(api_key=gemini_api_key)
+client = genai.GenerativeModel('gemini-2.0-flash')
 
 # --- Azure Speech ---
 speech_key = os.getenv("SPEECH_KEY")
@@ -128,8 +129,7 @@ def chat():
         def generate():
             """Генератор для потоковой передачи ответа"""
             try:
-                response = client.models.generate_content_stream(
-                    model="gemini-2.0-flash",
+                response = client.generate_content_stream(
                     contents=messages
                 )
 
