@@ -1,4 +1,4 @@
-# --- chat.py (полностью исправленная версия) ---
+# --- chat.py (полностью исправленная версия с обработкой ошибок речи) ---
 
 import os
 import base64
@@ -23,7 +23,6 @@ app = Flask(__name__)
 
 # --- Настройка CORS для GitHub Pages ---
 # Получаем список разрешенных источников из переменной окружения
-# Формат: "https://site1.com,https://site2.com" (через запятую)
 allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8080")
 allowed_origins = [origin.strip() for origin in allowed_origins_str.split(",")]
 
@@ -70,14 +69,14 @@ if not gemini_api_key:
     raise ValueError("Не задан GEMINI_API_KEY")
 
 genai.configure(api_key=gemini_api_key)
-model = genai.GenerativeModel('gemini-2.0-flash')  # Переименовал client в model для ясности
+model = genai.GenerativeModel('gemini-2.0-flash')
 
 # --- Azure Speech ---
 speech_key = os.getenv("SPEECH_KEY")
 speech_region = os.getenv("SPEECH_REGION")
 
 if not (speech_key and speech_region):
-    logging.warning("Azure Speech отключён.")
+    logging.warning("Azure Speech отключён. Речь будет недоступна.")
 
 # --- Системная инструкция (обновлена для AI-Дос) ---
 SYSTEM_INSTRUCTION = """
@@ -188,7 +187,7 @@ def chat():
         logging.error(f"Ошибка /api/chat: {e}", exc_info=True)
         return jsonify({"error": "Внутренняя ошибка сервера"}), 500
 
-# --- SPEECH API ---
+# --- SPEECH API с улучшенной обработкой ошибок ---
 @app.route('/api/speech', methods=['POST', 'OPTIONS'])
 def speech():
     """
@@ -211,8 +210,14 @@ def speech():
 
         text_clean = cleanup_text_for_speech(text)
 
-        if not (speech_key and speech_region):
-            return jsonify({"error": "Azure Speech не настроен"}), 500
+        # Проверяем наличие ключей Azure Speech
+        if not speech_key or not speech_region:
+            logging.warning("Azure Speech не настроен, возвращаем заглушку")
+            return jsonify({
+                "audio_base64": None,
+                "success": False,
+                "message": "Речь временно недоступна"
+            }), 200  # Возвращаем 200, а не 500!
 
         voice_name = os.getenv("AZURE_VOICE_NAME", "ru-RU-DmitryNeural")
         
@@ -249,13 +254,26 @@ def speech():
 
     except requests.exceptions.Timeout:
         logging.error("Таймаут при запросе к Azure Speech")
-        return jsonify({"error": "Таймаут сервиса речи"}), 504
+        return jsonify({
+            "audio_base64": None,
+            "success": False,
+            "message": "Таймаут сервиса речи"
+        }), 200
     except requests.exceptions.RequestException as e:
         logging.error(f"Ошибка запроса к Azure Speech: {e}")
-        return jsonify({"error": "Ошибка сервиса речи"}), 502
+        return jsonify({
+            "audio_base64": None,
+            "success": False,
+            "message": "Ошибка сервиса речи"
+        }), 200
     except Exception as e:
         logging.error(f"Ошибка /api/speech: {e}", exc_info=True)
-        return jsonify({"error": "Внутренняя ошибка сервера"}), 500
+        # Возвращаем 200 с сообщением об ошибке, чтобы фронтенд не падал
+        return jsonify({
+            "audio_base64": None,
+            "success": False,
+            "message": "Речь временно недоступна"
+        }), 200
 
 # --- Health check endpoint ---
 @app.route('/api/health', methods=['GET', 'OPTIONS'])
